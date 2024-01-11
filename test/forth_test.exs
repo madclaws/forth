@@ -184,7 +184,7 @@ defmodule ForthTest do
 
   @tag :custom_inv
   test "multiple definitions and invocations" do
-    assert {:ok, %{custom_words: %{"ten" => ["1"], "duplicate" => ["dup"]}, stack: [2]} = forth} =
+    assert {:ok, %{custom_words: %{"ten" => ["1"], "duplicate" => ["dup"]}, stack: [2]} = _forth} =
              Forth.new()
              |> Forth.eval(": ten 1 ; : duplicate dup ; ten duplicate +")
   end

@@ -23,21 +23,15 @@ defmodule Minesweeper do
         size = %{rows: total_rows, cols: total_cols}
 
         if grid[row][col] == " " do
-          sum =
-            nearby_mine(0, row, col, grid, size, :up)
-            |> nearby_mine(row, col, grid, size, :down)
-            |> nearby_mine(row, col, grid, size, :left)
-            |> nearby_mine(row, col, grid, size, :right)
-            |> nearby_mine(row, col, grid, size, :leftup)
-            |> nearby_mine(row, col, grid, size, :leftdown)
-            |> nearby_mine(row, col, grid, size, :rightup)
-            |> nearby_mine(row, col, grid, size, :rightdown)
-
-          if sum == 0 do
-            "#{counted_grid}."
-          else
-            "#{counted_grid}#{to_string(sum)}"
-          end
+          nearby_mine(0, row, col, grid, size, :up)
+          |> nearby_mine(row, col, grid, size, :down)
+          |> nearby_mine(row, col, grid, size, :left)
+          |> nearby_mine(row, col, grid, size, :right)
+          |> nearby_mine(row, col, grid, size, :leftup)
+          |> nearby_mine(row, col, grid, size, :leftdown)
+          |> nearby_mine(row, col, grid, size, :rightup)
+          |> nearby_mine(row, col, grid, size, :rightdown)
+          |> append_mine_count(counted_grid)
         else
           "#{counted_grid}*"
         end
@@ -123,4 +117,7 @@ defmodule Minesweeper do
   end
 
   defp nearby_mine(current_count, _, _, _, _, _), do: current_count
+
+  defp append_mine_count(0, counted_grid), do: "#{counted_grid}."
+  defp append_mine_count(sum, counted_grid), do: "#{counted_grid}#{to_string(sum)}"
 end
