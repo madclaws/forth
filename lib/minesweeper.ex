@@ -4,11 +4,50 @@ defmodule Minesweeper do
   https://exercism.org/tracks/elixir/exercises/minesweeper
   """
 
+  @doc """
+  Given a string board, returns the string but the mine count for the empty spaces
+  """
   @spec count_mines(String.t()) :: String.t()
   def count_mines(board) do
     # represent board as a 2d matrix
-    IO.inspect(board)
+    grid = create_2d_grid(board)
 
+    total_rows = Map.keys(grid) |> Enum.count()
+    total_cols = Map.keys(grid[0]) |> Enum.count()
+
+    # iterate through the 2d grid and add the mine count
+    Enum.reduce(0..(total_rows - 1), "", fn row, counted_grid ->
+      counted_grid = counted_grid <> "\n"
+
+      Enum.reduce(0..(total_cols - 1), counted_grid, fn col, counted_grid ->
+        size = %{rows: total_rows, cols: total_cols}
+
+        if grid[row][col] == " " do
+          sum =
+            nearby_mine(0, row, col, grid, size, :up)
+            |> nearby_mine(row, col, grid, size, :down)
+            |> nearby_mine(row, col, grid, size, :left)
+            |> nearby_mine(row, col, grid, size, :right)
+            |> nearby_mine(row, col, grid, size, :leftup)
+            |> nearby_mine(row, col, grid, size, :leftdown)
+            |> nearby_mine(row, col, grid, size, :rightup)
+            |> nearby_mine(row, col, grid, size, :rightdown)
+
+          if sum == 0 do
+            "#{counted_grid}."
+          else
+            "#{counted_grid}#{to_string(sum)}"
+          end
+        else
+          "#{counted_grid}*"
+        end
+      end)
+    end)
+    |> String.trim_leading("\n")
+  end
+
+  @spec create_2d_grid(String.t()) :: map()
+  defp create_2d_grid(board) do
     {_, grid} =
       String.trim(board, "\n")
       |> String.split("\n")
@@ -17,39 +56,8 @@ defmodule Minesweeper do
         inner_grid = create_inner_grid(row)
         {row_index + 1, Map.put(grid, row_index, inner_grid)}
       end)
-      |> IO.inspect()
 
-    rows = Map.keys(grid) |> Enum.count()
-    cols = Map.keys(grid[0]) |> Enum.count()
-
-    # iterate through the grid, and for each element
-    # if its empty (.), then count the surrounding mine
-    # just print for it now
-
-    Enum.reduce(0..rows - 1, %{}, fn row, counted_grid ->
-      counted_grid = put_in counted_grid[row], %{}
-      Enum.reduce(0..cols - 1, counted_grid, fn col, counted_grid ->
-        IO.inspect(grid[row][col], label: :elem)
-        if grid[row][col] == " " do
-          sum = mines_up(0, row, col, grid, rows, cols)
-          |> mines_down(row, col, grid, rows, cols)
-          |> mines_left(row, col, grid, rows, cols)
-          |> mines_right(row, col, grid, rows, cols)
-          |> mines_l_diagonal_up(row, col, grid, rows, cols)
-          |> mines_l_diagonal_down(row, col, grid, rows, cols)
-          |> mines_r_diagonal_up(row, col, grid, rows, cols)
-          |> mines_r_diagonal_down(row, col, grid, rows, cols)
-          put_in counted_grid[row][col], sum
-        else
-          put_in counted_grid[row][col], "*"
-        end
-      end)
-    end)
-    |> IO.inspect()
-
-    # render final board
-
-
+    grid
   end
 
   @spec create_inner_grid(String.t()) :: map()
@@ -68,47 +76,51 @@ defmodule Minesweeper do
     List.delete_at(t, -1)
   end
 
-  # can pack it in map later for reducing params
-  defp mines_up(current_count, row, col, grid, _t_rows, _t_cols) when row - 1 >= 0 do
+  @spec nearby_mine(
+          integer(),
+          integer(),
+          integer(),
+          map(),
+          map(),
+          :up | :down | :left | :right | :leftup | :leftdown | :rightup | :rightdown
+        ) :: integer()
+  defp nearby_mine(current_count, row, col, grid, _size, :up) when row - 1 >= 0 do
     if grid[row - 1][col] == "*", do: current_count + 1, else: current_count
   end
-  defp mines_up(current_count, _, _, _, _, _), do: current_count
 
-  defp mines_down(current_count, row, col, grid, t_row, _t_cols) when row + 1 <= t_row - 1 do
+  defp nearby_mine(current_count, row, col, grid, %{rows: rows}, :down)
+       when row + 1 <= rows - 1 do
     if grid[row + 1][col] == "*", do: current_count + 1, else: current_count
   end
-  defp mines_down(current_count, _, _, _, _, _), do: current_count
 
-  defp mines_left(current_count, row, col, grid, _t_row, _t_cols) when col - 1 >= 0 do
+  defp nearby_mine(current_count, row, col, grid, _size, :left) when col - 1 >= 0 do
     if grid[row][col - 1] == "*", do: current_count + 1, else: current_count
   end
 
-  defp mines_left(current_count, _, _, _, _, _), do: current_count
-
-  defp mines_right(current_count, row, col, grid, _t_row, t_cols) when col + 1 <= t_cols - 1 do
+  defp nearby_mine(current_count, row, col, grid, %{cols: cols}, :right)
+       when col + 1 <= cols - 1 do
     if grid[row][col + 1] == "*", do: current_count + 1, else: current_count
   end
 
-  defp mines_right(current_count, _, _, _, _, _), do: current_count
-
-  defp mines_l_diagonal_up(current_count, row, col, grid, _t_rows, _t_cols) when row - 1 >= 0 and col - 1 >= 0 do
+  defp nearby_mine(current_count, row, col, grid, _size, :leftup)
+       when row - 1 >= 0 and col - 1 >= 0 do
     if grid[row - 1][col - 1] == "*", do: current_count + 1, else: current_count
   end
-  defp mines_l_diagonal_up(current_count, _, _, _, _, _), do: current_count
 
-  defp mines_l_diagonal_down(current_count, row, col, grid, t_rows, _t_cols) when row + 1 <= t_rows - 1 and col - 1 >= 0 do
+  defp nearby_mine(current_count, row, col, grid, %{rows: rows}, :leftdown)
+       when row + 1 <= rows - 1 and col - 1 >= 0 do
     if grid[row + 1][col - 1] == "*", do: current_count + 1, else: current_count
   end
-  defp mines_l_diagonal_down(current_count, _, _, _, _, _), do: current_count
 
-  defp mines_r_diagonal_up(current_count, row, col, grid, _t_rows, t_cols) when row - 1 >= 0 and col + 1 <= t_cols - 1 do
+  defp nearby_mine(current_count, row, col, grid, %{cols: cols}, :rightup)
+       when row - 1 >= 0 and col + 1 <= cols - 1 do
     if grid[row - 1][col + 1] == "*", do: current_count + 1, else: current_count
   end
-  defp mines_r_diagonal_up(current_count, _, _, _, _, _), do: current_count
 
-  defp mines_r_diagonal_down(current_count, row, col, grid, t_rows, t_cols) when row + 1 <= t_rows - 1 and col + 1 <= t_cols - 1 do
+  defp nearby_mine(current_count, row, col, grid, %{rows: rows, cols: cols}, :rightdown)
+       when row + 1 <= rows - 1 and col + 1 <= cols - 1 do
     if grid[row + 1][col + 1] == "*", do: current_count + 1, else: current_count
   end
-  defp mines_r_diagonal_down(current_count, _, _, _, _, _), do: current_count
 
+  defp nearby_mine(current_count, _, _, _, _, _), do: current_count
 end
