@@ -6,10 +6,11 @@ defmodule Forth do
   # TODO: typedoc
   @type t :: %__MODULE__{
           stack: list(integer()),
-          custom_words: map()
+          custom_words: map(),
+          tokens: list(String.t())
         }
 
-  defstruct stack: [], custom_words: %{}
+  defstruct stack: [], custom_words: %{}, tokens: []
 
   @spec new :: __MODULE__.t()
   def new do
@@ -26,30 +27,74 @@ defmodule Forth do
   """
   @spec eval(__MODULE__.t(), String.t()) :: {:ok, __MODULE__.t()} | {:error, String.t()}
   def eval(%__MODULE__{} = forth, input) do
-    String.split(input)
-    |> Enum.reduce_while(forth, fn data, forth ->
-      case eval_token(forth, data) do
-        %__MODULE__{} = res -> {:cont, res}
-        res -> {:halt, {:error, res}}
-      end
-    end)
+    %{forth | tokens: String.split(input) |> Enum.map(&String.downcase/1)}
+    |> eval_token()
     |> case do
       %__MODULE__{} = res ->
         {:ok, %{res | stack: Enum.reverse(res.stack)}}
 
       err ->
-        err
+        {:error, err}
     end
   end
 
-  @spec eval_token(__MODULE__.t(), token :: String.t()) :: list(integer()) | String.t()
-  defp eval_token(%__MODULE__{stack: stack} = forth, token) do
+  @spec eval_token(__MODULE__.t() | String.t()) :: stack :: __MODULE__.t() | String.t()
+  defp eval_token(error) when is_binary(error), do: error
+
+  defp eval_token(%__MODULE__{stack: _stack, tokens: []} = forth), do: forth
+
+  defp eval_token(%__MODULE__{stack: stack, tokens: [token | rest]} = forth)
+       when token in ["+", "-", "/", "*"] do
+    case eval_arithmetic(token, stack) do
+      [_ | _] = stack ->
+        eval_token(%{forth | stack: stack, tokens: rest})
+
+      err ->
+        eval_token(err)
+    end
+  end
+
+  defp eval_token(%__MODULE__{stack: [], tokens: ["dup" | _]}),
+    do: eval_token("Not enough elements in stack for operaiton: DUP")
+
+  defp eval_token(%__MODULE__{stack: [a | _], tokens: ["dup" | rest]} = forth) do
+    eval_token(%{forth | stack: [a | forth.stack], tokens: rest})
+  end
+
+  defp eval_token(%__MODULE__{stack: [], tokens: ["drop" | _]}),
+    do: eval_token("Not enough elements in stack for operaiton: DROP")
+
+  defp eval_token(%__MODULE__{stack: [_ | t], tokens: ["drop" | rest]} = forth) do
+    eval_token(%{forth | stack: t, tokens: rest})
+  end
+
+  defp eval_token(%__MODULE__{stack: [b, a | _], tokens: ["swap" | rest]} = forth) do
+    eval_token(%{
+      forth
+      | stack:
+          List.replace_at(forth.stack, 0, a)
+          |> List.replace_at(1, b),
+        tokens: rest
+    })
+  end
+
+  defp eval_token(%__MODULE__{tokens: ["swap" | _]}),
+    do: eval_token("Not enough elements in stack for operaiton: SWAP")
+
+  defp eval_token(%__MODULE__{stack: [_b, a | _], tokens: ["over" | rest]} = forth) do
+    eval_token(%{forth | stack: [a | forth.stack], tokens: rest})
+  end
+
+  defp eval_token(%__MODULE__{tokens: ["over" | _]}),
+    do: eval_token("Not enough elements in stack for operaiton: OVER")
+
+  defp eval_token(%__MODULE__{stack: stack, tokens: [token | rest]} = forth) do
     cond do
       number?(token) ->
-        %{forth | stack: [String.to_integer(token) | stack]}
+        eval_token(%{forth | stack: [String.to_integer(token) | stack], tokens: rest})
 
       true ->
-        eval_word(forth, String.downcase(token))
+        eval_token("No OP defined")
     end
   end
 
@@ -61,48 +106,11 @@ defmodule Forth do
   end
 
   # TODO: Add the required stack size check
-  @spec eval_word(__MODULE__.t(), String.t()) :: stack :: __MODULE__.t() | String.t()
-  defp eval_word(%__MODULE__{stack: stack} = forth, token) when token in ["+", "-", "/", "*"] do
-    with [_ | _] = stack <- eval_arithmetic(token, stack) do
-      %{forth | stack: stack}
-    end
-  end
 
-  defp eval_word(%__MODULE__{stack: []}, "dup"),
-    do: "Not enough elements in stack for operaiton: DUP"
-
-  defp eval_word(%__MODULE__{stack: [a | _]} = forth, "dup") do
-    %{forth | stack: [a | forth.stack]}
-  end
-
-  defp eval_word(%__MODULE__{stack: []}, "drop"),
-    do: "Not enough elements in stack for operaiton: DROP"
-
-  defp eval_word(%__MODULE__{stack: [_ | t]} = forth, "drop") do
-    %{forth | stack: t}
-  end
-
-  defp eval_word(%__MODULE__{stack: [b, a | _]} = forth, "swap") do
-    %{
-      forth
-      | stack:
-          List.replace_at(forth.stack, 0, a)
-          |> List.replace_at(1, b)
-    }
-  end
-
-  defp eval_word(_forth, "swap"), do: "Not enough elements in stack for operaiton: SWAP"
-
-  defp eval_word(%__MODULE__{stack: [_b, a | _]} = forth, "over") do
-    %{forth | stack: [a | forth.stack]}
-  end
-
-  defp eval_word(_forth, "over"), do: "Not enough elements in stack for operaiton: OVER"
-
-  defp eval_word(%__MODULE__{} = forth, ":") do
-  end
-
-  defp eval_word(_, _), do: "No OP defined"
+  # defp eval_token(%__MODULE__{} = forth, ":") do
+  #   # start of word definition.
+  #   # we basically have to peek until the semicolon
+  # end
 
   @spec eval_arithmetic(String.t(), list(integer())) :: list(integer()) | String.t()
   defp eval_arithmetic(operation, stack) when length(stack) >= 2 do

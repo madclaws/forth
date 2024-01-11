@@ -50,6 +50,7 @@ defmodule ForthTest do
              |> Forth.eval("20 2 /")
   end
 
+  @tag :bug
   test "division, failed" do
     assert {:error, "Division by zero is invalid"} =
              Forth.new()
