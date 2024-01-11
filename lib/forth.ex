@@ -43,7 +43,7 @@ defmodule Forth do
         [String.to_integer(token) | stack]
 
       true ->
-        eval_word(stack, token)
+        eval_word(stack, String.downcase(token))
     end
   end
 
@@ -56,17 +56,37 @@ defmodule Forth do
 
   # TODO: Add the required stack size check
   @spec eval_word(list(integer()), String.t()) :: stack :: list(integer()) | String.t()
-  defp eval_word(stack, token) do
-    IO.inspect(stack)
-
-    case token do
-      token when token in ["+", "-", "/", "*"] -> eval_arithmetic(token, stack)
-      "DUP" -> stack
-      "DROP" -> stack
-      "SWAP" -> stack
-      "OVER" -> stack
-    end
+  defp eval_word(stack, token) when token in ["+", "-", "/", "*"] do
+    eval_arithmetic(token, stack)
   end
+
+  defp eval_word([], "dup"), do: "Not enough elements in stack for operaiton: DUP"
+
+  defp eval_word([a | _] = stack, "dup") do
+    [a | stack]
+  end
+
+  defp eval_word([], "drop"), do: "Not enough elements in stack for operaiton: DROP"
+
+  defp eval_word([_ | t] = _stack, "drop") do
+    t
+  end
+
+  defp eval_word([b, a | _] = stack, "swap") do
+    List.replace_at(stack, 0, a)
+    |> List.replace_at(1, b)
+  end
+
+  defp eval_word(_stack, "swap"), do: "Not enough elements in stack for operaiton: SWAP"
+
+  defp eval_word([_b, a | _] = stack, "over") do
+    [a | stack]
+  end
+
+  defp eval_word(_stack, "over"), do: "Not enough elements in stack for operaiton: OVER"
+
+
+  defp eval_word(_, _), do: "No OP defined"
 
   @spec eval_arithmetic(String.t(), list(integer())) :: list(integer()) | String.t()
   defp eval_arithmetic(operation, stack) when length(stack) >= 2 do
