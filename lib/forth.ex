@@ -1,9 +1,14 @@
 defmodule Forth do
   @moduledoc """
-  Documentation for `Forth`.
+  Basic forth evaluator
+  https://exercism.org/tracks/elixir/exercises/forth
   """
 
-  # TODO: typedoc
+  @typedoc """
+  stack - List of integers
+  custom_words - A map of user defined words and its values (values as a list)
+  tokens - List of tokens from the eval input
+  """
   @type t :: %__MODULE__{
           stack: list(integer()),
           custom_words: map(),
@@ -12,15 +17,22 @@ defmodule Forth do
 
   defstruct stack: [], custom_words: %{}, tokens: []
 
+  @doc """
+  Creates an empty forth struct
+  """
   @spec new :: __MODULE__.t()
   def new do
     %__MODULE__{}
   end
 
+  @doc """
+  Returns the current stack with given forth struct
+  """
   @spec stack(__MODULE__.t()) :: list(integer())
   def stack(%__MODULE__{stack: stack}), do: stack
 
   @doc """
+  Evaluate the input with the given forth struct
 
   NOTE: Stack pushes are prepended than appended for faster and easier list manipulations.
   After the evaluation, the stack list is reversed.
@@ -133,11 +145,11 @@ defmodule Forth do
         eval_token(%{forth | tokens: forth.custom_words[token] ++ next})
 
       true ->
-        eval_token("No OP defined")
+        eval_token("No Operation defined")
     end
   end
 
-  # numbers should be noe or more ascii digits
+  # numbers should be one or more ascii digits
   @spec number?(String.t()) :: boolean()
   defp number?(num) do
     String.to_charlist(num)
@@ -148,27 +160,29 @@ defmodule Forth do
   defp eval_arithmetic(operation, stack) when length(stack) >= 2 do
     [b, a | _] = stack
 
-    # TODO: A chance to refactor below redundant code
     case operation do
       "+" ->
-        List.delete_at(stack, 0)
-        |> List.replace_at(0, a + b)
+        a + b
 
       "-" ->
-        List.delete_at(stack, 0)
-        |> List.replace_at(0, a - b)
+        a - b
 
       "*" ->
-        List.delete_at(stack, 0)
-        |> List.replace_at(0, a * b)
+        a * b
 
-      "/" ->
-        if b == 0 do
-          "Division by zero is invalid"
-        else
-          List.delete_at(stack, 0)
-          |> List.replace_at(0, div(a, b))
-        end
+      "/" when b == 0 ->
+        "Division by zero is invalid"
+
+      "/" when b > 0 ->
+        div(a, b)
+    end
+    |> case do
+      result when is_binary(result) ->
+        result
+
+      result ->
+        List.delete_at(stack, 0)
+        |> List.replace_at(0, result)
     end
   end
 
@@ -180,16 +194,14 @@ defmodule Forth do
   end
 
   defp add_custom_words(custom_words, custom_word_name, definitions) do
-    defs =
-      case Enum.find_index(definitions, fn token -> token == custom_word_name end) do
-        nil ->
-          definitions
+    case Enum.find_index(definitions, fn token -> token == custom_word_name end) do
+      nil ->
+        definitions
 
-        # inlining the redundant token to avoid infinite loop
-        index ->
-          List.replace_at(definitions, index, custom_words[custom_word_name]) |> List.flatten()
-      end
-
-    Map.put(custom_words, String.downcase(custom_word_name), defs)
+      # inlining the redundant token to avoid infinite loop
+      index ->
+        List.replace_at(definitions, index, custom_words[custom_word_name]) |> List.flatten()
+    end
+    |> then(&Map.put(custom_words, String.downcase(custom_word_name), &1))
   end
 end

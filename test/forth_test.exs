@@ -2,8 +2,6 @@ defmodule ForthTest do
   use ExUnit.Case
   doctest Forth
 
-  # TODO: handling of extra spaces in eval?
-
   test "empty stack" do
     assert Forth.new() |> Forth.stack() == []
   end
